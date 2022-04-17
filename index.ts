@@ -11,6 +11,19 @@ class Game {
         this.height = _height
         this.g = _g
     }
+
+    public static updateScore(newScore:number, target:number) {
+        let scoreDoc:HTMLElement | null = document.getElementById('score')
+        if(scoreDoc) {
+            // Update text on screen
+            scoreDoc.innerText = newScore.toString()
+
+            if(newScore == target) {
+                alert('CONGRATs! You have won this game')
+                location.reload()
+            }
+        }
+    }
 }
 
 class Snake extends Game {
@@ -37,10 +50,6 @@ class Snake extends Game {
         return this.g
     }
 
-    public movePos(i:number, j:number, moveBy:number) {
-        this.pos[i][j] += moveBy
-    }
-
     // draw snake on canvas
     public draw() {
         this.ctx.fillStyle = this.color
@@ -50,9 +59,26 @@ class Snake extends Game {
             this.ctx.strokeRect(this.pos[i][0], this.pos[i][1], this.g, this.g)
         }
     }
+
+    // Move snake body position
+    public movePos(x:number, y:number, moveBy:number) {
+        // update all position BACKWARD
+        if(this.pos.length > 1) {
+            for(let i = this.pos.length - 1; i > 0; i--) {
+                this.pos[i][0] = this.pos[i - 1][0]
+                this.pos[i][1] = this.pos[i - 1][1]
+            }
+        }
+
+        this.pos[x][y] += moveBy
+    }
     
     // snake eats food
-    public eat() {}
+    public eat(toBeAdded:number[]) {
+        this.pos.unshift(toBeAdded)
+        this.score += 10
+        Game.updateScore(this.score, this.width * this.height * 10 - 10)
+    }
 }
 
 class Food extends Game {
@@ -72,19 +98,26 @@ class Food extends Game {
         return this.y
     }
 
-    public draw(_snakePos:number[][] = []):boolean {
-        let randX:number = Math.random() * this.width - g //Random for X position of food
-        let randY:number = Math.random() * this.height - g //Random for Y position of food
-        this.x = randX - (randX % 20)
-        this.y = randY - (randY % 20)
-
-        // Make sure the food doesn't appear inside snake's body
-        for(let i = 0; i < _snakePos.length; i++) {
-            if(this.x == _snakePos[i][0] && this.y == _snakePos[i][1]) {
-                let ok:boolean = this.draw(_snakePos)
-                if(ok) return true
+    public draw(_snakePos:number[][], isRandom:boolean):boolean {
+        if(isRandom) {
+            // If snake occupies all spots return
+            if(_snakePos.length == (this.width/this.g) * (this.height/this.g)) {
+                return true
             }
-        }
+
+            let randX:number = Math.random() * this.width - g //Random for X position of food
+            let randY:number = Math.random() * this.height - g //Random for Y position of food
+            this.x = randX - (randX % 20)
+            this.y = randY - (randY % 20)
+
+            // Make sure the food doesn't appear inside snake's body
+            for(let i = 0; i < _snakePos.length; i++) {
+                if(this.x == _snakePos[i][0] && this.y == _snakePos[i][1]) {
+                    let ok:boolean = this.draw(_snakePos, isRandom)
+                    if(ok) return true
+                }
+            }
+    }
         this.ctx.fillStyle = 'red'
         this.ctx.fillRect(this.x, this.y, this.g, this.g)
         return true
@@ -118,7 +151,7 @@ if(ctx) {
         canvas.width, canvas.height, g,
         'red'
     )
-    food.draw(snake.getPos())
+    food.draw(snake.getPos(), true)
 
     // Keyboard event handler
     // Move snake depending on keyboard event
@@ -127,10 +160,10 @@ if(ctx) {
 
         // flag variable for snake movement
         // true when one of arrow key is pressed by user
-        let isMoved = true
+        let isMoved:boolean = true
         let snakePos:number[][] = snake.getPos()
         let snakeSize:number = snake.getSize()
-        let newSnakePos:number[] = []
+        let toBeAdded:number[] = []
         let i = 0, j = 0 // snake position to be updated
         let moveBy:number = 0
 
@@ -138,31 +171,23 @@ if(ctx) {
         switch(e.key) {
             case 'ArrowUp':
                 // Add one new body to snake (if snake eats the food)
-                newSnakePos = [food.getX(), food.getY() - snakeSize]
-                i = 0
-                j = 1
-                moveBy = -g
+                toBeAdded = [food.getX(), food.getY() - snakeSize]
+                i = 0; j = 1; moveBy = -g
                 break
             case 'ArrowDown':
                 // Add one new body to snake (if snake eats the food)
-                newSnakePos = [food.getX(), food.getY() + snakeSize]
-                i = 0
-                j = 1
-                moveBy = g
+                toBeAdded = [food.getX(), food.getY() + snakeSize]
+                i = 0; j = 1; moveBy = g
                 break
             case 'ArrowRight':
                 // Add one new body to snake (if snake eats the food)
-                newSnakePos = [food.getX() + snakeSize, food.getY()]
-                i = 0
-                j = 0
-                moveBy = g
+                toBeAdded = [food.getX() + snakeSize, food.getY()]
+                i = 0; j = 0; moveBy = g
                 break
             case 'ArrowLeft':
                 // Add one new body to snake (if snake eats the food)
-                newSnakePos = [food.getX() - snakeSize, food.getY()]
-                i = 0
-                j = 0
-                moveBy = -g
+                toBeAdded = [food.getX() - snakeSize, food.getY()]
+                i = 0; j = 0; moveBy = -g
                 break
             default:
                 isMoved = false
@@ -175,6 +200,18 @@ if(ctx) {
 
             // Set new interval
             intv = setInterval(() => {
+                // Clear all previous drawings
+                ctx!.fillStyle = 'black'
+                ctx!.fillRect(0, 0, canvas.width, canvas.height)
+
+                // Check for collision
+                if(snakePos[0][0] == food.getX() && snakePos[0][1] == food.getY()) {
+                    snake.eat(toBeAdded)
+                    food.draw(snake.getPos(), true)
+                } else { // No collision, draw the food at the same spot
+                    food.draw(snakePos, false) // redraw food
+                }
+
                 // update snake position
                 snake.movePos(i, j, moveBy)
                 snake.draw() // redraw snake
