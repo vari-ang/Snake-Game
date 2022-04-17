@@ -47,7 +47,7 @@ class Snake extends Game {
     }
     // Move snake body position
     movePos(x, y, moveBy) {
-        // update all position BACKWARD
+        // move snake bodies by updating all block form the back of the array
         if (this.pos.length > 1) {
             for (let i = this.pos.length - 1; i > 0; i--) {
                 this.pos[i][0] = this.pos[i - 1][0];
@@ -55,12 +55,28 @@ class Snake extends Game {
             }
         }
         this.pos[x][y] += moveBy;
+        // Check to see if the snake hits the border
+        if (this.pos[0][0] == this.width || this.pos[0][0] == -this.g || this.pos[0][1] == this.height || this.pos[0][1] == -this.g)
+            this.dead();
+        // Check to see if the snake hits its own body
+        if (this.pos.length > 1) {
+            for (let i = 1; i < this.pos.length; i++) {
+                if (this.pos[0][0] == this.pos[i][0] && this.pos[0][1] == this.pos[i][1])
+                    this.dead();
+            }
+        }
     }
     // snake eats food
     eat(toBeAdded) {
         this.pos.unshift(toBeAdded);
         this.score += 10;
         Game.updateScore(this.score, this.width * this.height * 10 - 10);
+    }
+    // Snake died, game over
+    dead() {
+        // Alert game over and last score
+        alert('GAME OVER\nYour score was: ' + this.score);
+        location.reload();
     }
 }
 class Food extends Game {
